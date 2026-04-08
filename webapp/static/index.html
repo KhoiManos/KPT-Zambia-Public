@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ECS Data Pipeline — Upload sensor CSVs, explore the database, and run SQL queries on Kitchen Performance Test data from Zambia.">
+    <title>ECS Data Pipeline — Kitchen Performance Test</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- CodeMirror 6 via CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-ocean.min.css">
+
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- ============================== HEADER ============================== -->
+<header id="app-header">
+    <div class="header-left">
+        <div class="logo-mark">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <rect width="28" height="28" rx="8" fill="url(#logo-grad)"/>
+                <path d="M7 14h14M14 7v14M9 9l10 10M19 9L9 19" stroke="#fff" stroke-width="1.5" stroke-linecap="round" opacity=".6"/>
+                <circle cx="14" cy="14" r="4" fill="#fff" opacity=".9"/>
+                <defs><linearGradient id="logo-grad" x1="0" y1="0" x2="28" y2="28"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs>
+            </svg>
+        </div>
+        <div class="header-titles">
+            <h1>ECS Data Pipeline</h1>
+            <span class="header-subtitle">Kitchen Performance Test · Zambia</span>
+        </div>
+    </div>
+    <div class="header-right">
+        <span class="db-status" id="db-status">
+            <span class="status-dot"></span>
+            <span class="status-text">Connecting…</span>
+        </span>
+    </div>
+</header>
+
+<!-- ============================== NAV TABS ============================== -->
+<nav id="tab-bar">
+    <button class="tab active" data-tab="upload" id="tab-upload">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload
+    </button>
+    <button class="tab" data-tab="explorer" id="tab-explorer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        Explorer
+    </button>
+    <button class="tab" data-tab="sql" id="tab-sql">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        SQL Editor
+    </button>
+</nav>
+
+<!-- ============================== PANELS ============================== -->
+<main id="panels">
+
+    <!-- ============ UPLOAD PANEL ============ -->
+    <section class="panel active" id="panel-upload">
+        <div class="panel-header">
+            <h2>Upload CSV Files</h2>
+            <p class="panel-desc">Drag &amp; drop ECS sensor CSV files (FUEL or EXACT) to run the ETL pipeline and insert data into the database.</p>
+        </div>
+
+        <div class="drop-zone" id="drop-zone">
+            <div class="drop-zone-inner">
+                <div class="drop-icon">
+                    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </div>
+                <p class="drop-title">Drop CSV files or folders here</p>
+                <p class="drop-sub">or click to browse</p>
+                <input type="file" id="file-input" accept=".csv" multiple hidden>
+                <input type="file" id="folder-input" webkitdirectory hidden>
+                <div class="drop-actions">
+                    <button class="btn btn-primary" id="btn-browse-files">Browse Files</button>
+                    <button class="btn btn-ghost" id="btn-browse-folder">Browse Folder</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload progress / results -->
+        <div class="upload-results" id="upload-results" style="display:none;">
+            <h3>ETL Results</h3>
+            <div id="upload-results-list"></div>
+        </div>
+    </section>
+
+    <!-- ============ EXPLORER PANEL ============ -->
+    <section class="panel" id="panel-explorer">
+        <div class="panel-header">
+            <h2>Database Explorer</h2>
+            <p class="panel-desc">Browse tables, view schemas, and preview data from the ECS database.</p>
+        </div>
+
+        <div class="explorer-layout">
+            <div class="table-list-container glass-card">
+                <h3 class="card-title">Tables</h3>
+                <div id="table-list" class="table-list">
+                    <div class="loading-shimmer"></div>
+                </div>
+            </div>
+
+            <div class="table-detail-container glass-card" id="table-detail">
+                <div class="detail-placeholder">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity=".3"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                    <p>Select a table to view its schema and data</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============ SQL PANEL ============ -->
+    <section class="panel" id="panel-sql">
+        <div class="sql-layout">
+            <!-- History sidebar -->
+            <aside class="history-sidebar glass-card" id="history-sidebar">
+                <h3 class="card-title">Query History</h3>
+                <div id="history-list" class="history-list">
+                    <p class="empty-state">No queries yet</p>
+                </div>
+            </aside>
+
+            <div class="sql-main">
+                <div class="sql-editor-container glass-card">
+                    <div class="editor-toolbar">
+                        <h3 class="card-title">SQL Query</h3>
+                        <div class="editor-controls">
+                            <label class="toggle-label" id="readonly-toggle-label">
+                                <input type="checkbox" id="readonly-toggle" checked>
+                                <span class="toggle-slider"></span>
+                                Read-only
+                            </label>
+                            <button class="btn btn-primary btn-execute" id="btn-execute">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                Execute
+                            </button>
+                        </div>
+                    </div>
+                    <div id="sql-editor"></div>
+                </div>
+
+                <div class="sql-results-container glass-card" id="sql-results-container">
+                    <div class="results-header" id="results-header" style="display:none;">
+                        <span id="results-info"></span>
+                        <button class="btn btn-ghost btn-sm" id="btn-export-csv" style="display:none;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Export CSV
+                        </button>
+                    </div>
+                    <div class="results-placeholder" id="results-placeholder">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" opacity=".3"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                        <p>Run a query to see results</p>
+                    </div>
+                    <div class="results-table-wrap" id="results-table-wrap" style="display:none;">
+                        <table id="results-table">
+                            <thead id="results-thead"></thead>
+                            <tbody id="results-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<!-- CodeMirror JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/sql-hint.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+<script src="/static/app.js"></script>
+</body>
+</html>
