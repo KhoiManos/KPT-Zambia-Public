@@ -1,0 +1,19 @@
+{
+    "sqltools.useNodeRuntime": true,
+    "workbench.editorAssociations": {
+        "*.copilotmd": "vscode.markdown.preview.editor",
+        "*.parquet": "duckdb.dataFileViewer",
+        "*.csv": "duckdb.dataFileViewer",
+        "*.tsv": "duckdb.dataFileViewer",
+        "*.xlsx": "duckdb.dataFileViewer"
+    },
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "driver": "DuckDB",
+            "name": "ecs.db",
+            "group": "DuckDB",
+            "database": "${workspaceFolder:ECS_Zambia}/ECS_Datenbank.db"
+        }
+    ]
+}
