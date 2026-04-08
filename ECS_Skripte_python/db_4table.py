@@ -6,28 +6,30 @@ from datetime import datetime
 
 # this file's purpose is to read all csv files and turn them in to a database, 
 # so that we can easily access the data for our analysis.
-
-current_folder = os.path.dirname(__file__)
-project_folder = os.path.dirname(current_folder)
-database_pfad = os.path.join(project_folder, "Datenanalyse" ,"ECS_Database.db")
-
-# dircetor existance check and create if not exist
-os.makedirs(os.path.dirname(database_pfad), exist_ok=True)
-
-conn = sqlite3.connect(database_pfad)
-
-search_path_fuel = os.path.join(project_folder, "ECS_FUEL", "**", "*.csv")
-all_fuel_files = glob.glob(search_path_fuel, recursive=True)
-
-search_path_exact = os.path.join(project_folder, "ECS_EXACT", "**", "*.csv")
-all_exact_files = glob.glob(search_path_exact, recursive=True)
-
-time_format = "%Y-%m-%d %H:%M:%S"
 count_id = 0
-fixed_names = ['timestamp', 'usage', 'gradient', 'temperature']
+
+def get_paths():
+    current_folder = os.path.dirname(__file__)
+    project_folder = os.path.dirname(current_folder)
+    database_pfad = os.path.join(project_folder, "Datenanalyse" ,"ECS_Database.db")
+
+    # dircetor existance check and create if not exist
+    os.makedirs(os.path.dirname(database_pfad), exist_ok=True)
+
+    conn = sqlite3.connect(database_pfad)
+
+    search_path_fuel = os.path.join(project_folder, "ECS_FUEL", "**", "*.csv")
+    all_fuel_files = glob.glob(search_path_fuel, recursive=True)
+
+    search_path_exact = os.path.join(project_folder, "ECS_EXACT", "**", "*.csv")
+    all_exact_files = glob.glob(search_path_exact, recursive=True)
+
+    time_format = "%Y-%m-%d %H:%M:%S"
+
+    return conn, all_fuel_files, all_exact_files, time_format
 
 
-def process_csv_files(conn):
+def process_csv_files(conn, all_fuel_files, time_format = "%Y-%m-%d %H:%M:%S"):
     """reads all csv files, extracts meta data and data, connects them and writes to database.
      IMPORTANT: this function also cuts the .csv files to one week of data gathered.
      This function is not modular
@@ -73,7 +75,8 @@ def process_csv_files(conn):
         except Exception as e:
             print(f"Fehler beim Verarbeiten von {file}: {e}")
 
-def process_exact_files(conn):
+def process_exact_files(conn, all_exact_files, time_format = "%Y-%m-%d %H:%M:%S", fixed_names = ['timestamp', 'usage', 'gradient', 'temperature']
+):
     """reads all csv files, extracts meta data and data, connects them and writes to database.
      IMPORTANT: this function also cuts the .csv files to one week of data gathered.
      This function is not modular
@@ -124,7 +127,6 @@ def process_exact_files(conn):
         except Exception as e:
             print(f"Fehler beim Verarbeiten von {file}: {e}")
 
-process_csv_files(conn)
-process_exact_files(conn)
+# process_csv_files(conn)
+# process_exact_files(conn)
 # process_csv_files(all_exact_files, conn, "measurements")
-conn.close()

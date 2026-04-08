@@ -4,13 +4,10 @@ import shutil
 
 
 ordner = "ECS_RAW"
-auswertung = "ECS_HHID"
-fuelAuswertung = "ECS_FUEL"
-exactAuswertung = "ECS_EXACT"
+
 all_data = os.listdir(ordner)
 
-auswertung_pfad = os.listdir(auswertung)
-fuelAuswertung_pfad = os.listdir(fuelAuswertung)
+
 
 def domainExpansion(type, folder):
     for datei in all_data:
@@ -36,8 +33,8 @@ def domainExpansion(type, folder):
             shutil.copy(dateipfad, goal)
 
 
-domainExpansion("FUEL", fuelAuswertung)
-domainExpansion("EXACT", exactAuswertung)
+#domainExpansion("FUEL", fuelAuswertung)
+#domainExpansion("EXACT", exactAuswertung)
 
         
 
