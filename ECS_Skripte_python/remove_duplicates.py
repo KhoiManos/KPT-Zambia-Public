@@ -5,7 +5,7 @@ import glob
 from datetime import datetime
 
 time_format = "%Y-%m-%d %H:%M:%S"
-global count_id
+
 
 
 def get_paths():

@@ -1,0 +1,29 @@
+sep=,
+
+firmware launcher:,8.02
+firmware GUI,6.70
+
+Household ID:,101
+Sensor ID:,29608
+Sensor Type:,EXACTv2 
+Start time:,2025-11-06 12:01:46
+Stop time:,2025-11-07 11:13:46
+Total number of logs:,10
+Maximum temperature:,26.6
+Errors:,0
+Stove Name:,Char Bas
+Cooking Events per day:,0.0
+Cooking Time (min/day):,0.0
+Number of days of cooking:,0
+
+Timestamp,Usage EXACT 29608,Gradient EXACT 29608,Temperature EXACT 29608
+2025-11-06 12:03:46,0,,24.22
+2025-11-06 12:05:46,0,,23.92
+2025-11-06 12:07:46,0,,23.61
+2025-11-06 12:09:46,0,,23.15
+2025-11-06 12:11:46,0,,22.64
+2025-11-06 12:13:46,0,,22.19
+2025-11-06 12:15:46,0,,21.79
+2025-11-06 12:17:46,0,,21.52
+2025-11-06 12:19:46,0,,21.28
+2025-11-06 12:21:46,0,,21.28
