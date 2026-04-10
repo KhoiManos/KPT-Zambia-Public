@@ -299,7 +299,7 @@
 
         editor = CodeMirror($('#sql-editor'), {
             mode: 'text/x-sql',
-            theme: 'material-ocean',
+            theme: 'idea',
             lineNumbers: true,
             lineWrapping: true,
             indentWithTabs: false,

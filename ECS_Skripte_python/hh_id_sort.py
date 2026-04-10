@@ -17,11 +17,15 @@ def domainExpansion(type, folder):
         # & datei.startswith("EXACT")
 
             dateipfad = os.path.join(ordner, datei)
-            df = pd.read_csv(dateipfad, skiprows=1, header=None, nrows=10, encoding='latin-1')
-           
+            df = pd.read_csv(dateipfad, skiprows=1, header=None, nrows=12, encoding='latin-1')
+
+            # Überprüfen ob Error = 1
+            error = df.iloc[9, 1]
+            if error == 1:
+                continue
+
             # HHID wird gelesen
-            zeile = df.iloc[2] 
-            hhid = zeile[1]
+            hhid = df.iloc[2, 1]
 
             # Ordner erstelen und Dateien kopieren (Argument anpassen, damit es in den richtigen Ordner kommt)
             newFolder = os.path.join(folder, hhid)

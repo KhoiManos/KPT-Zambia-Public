@@ -22,7 +22,7 @@ def main():
     os.makedirs(fuelAuswertung, exist_ok=True)
 
     print("Sorting files by household ID...")
-    # First, we need to sort the files by their household ID. This is done in the hh_id_sort module.
+    # First, we need to sort the files by their household ID (and filter out the files with error = 1). This is done in the hh_id_sort module.
     hh_id_sort.domainExpansion("FUEL", fuelAuswertung)
     hh_id_sort.domainExpansion("EXACT", exactAuswertung)
 
