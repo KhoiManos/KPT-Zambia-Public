@@ -104,9 +104,6 @@ def remove_duplicates(all_folders, format="%Y-%m-%d %H:%M:%S"):
                 print(f"kapow: {os.path.basename(file_path)}")
                 print(f"+ deleted files: {delete_count}")
 
-        print(f"{delete_count}")
-
-
 if __name__ == "__main__":
     _, all_fuel_folders, all_exact_folders = get_paths()
     remove_duplicates(all_fuel_folders)

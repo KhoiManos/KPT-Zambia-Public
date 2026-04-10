@@ -17,8 +17,14 @@ def domainExpansion(type, folder):
         # & datei.startswith("EXACT")
 
             dateipfad = os.path.join(ordner, datei)
-            df = pd.read_csv(dateipfad, skiprows=1, header=None, nrows=10, encoding='latin-1')
+            df = pd.read_csv(dateipfad, skiprows=1, header=None, nrows=12, encoding='latin-1')
            
+            # Fehler aussortieren
+            if(datei.startswith("ECS_EXACT")):
+                error = df.iloc[9 ,1]
+                if int(error) > 0:
+                    continue
+
             # HHID wird gelesen
             zeile = df.iloc[2] 
             hhid = zeile[1]
