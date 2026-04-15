@@ -17,6 +17,8 @@ The dummy files follow the same naming pattern as the original data:
 - FUEL sensor data: `FUELv2_dummy_[SENSOR_ID]_[START_TIMESTAMP]_CLEAN.csv`
 Each file contains a reduced number of data points (typically 10 rows) but maintains the same column structure and metadata format as the original files.
 
+Webapp is coming soon! But for now:
+
 ## Usage
 To use this dummy data with the analysis scripts:
 1. Copy the desired dummy files to the appropriate directories (ECS_EXACT/, ECS_FUEL/, etc.)
