@@ -187,7 +187,7 @@
             const icon = r.status === 'success' ? '✓' : r.status === 'skipped' ? '⟳' : '✕';
             const typeClass = (r.type || '').toLowerCase();
             const detail = r.status === 'success'
-                ? `${formatNum(r.rows_inserted)} rows inserted · HH ${r.hhid} · Sensor ${r.sensor_id}`
+                ? 'File uploaded successfully'
                 : r.reason || 'Unknown error';
 
             return `
