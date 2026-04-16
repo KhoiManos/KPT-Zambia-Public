@@ -79,25 +79,66 @@ def get_next_id(conn, table: str, id_col: str) -> int:
 
 
 def check_duplicate(
-    conn, csv_type: str, hhid: str, sensor_id: str, start_time: str
-) -> bool:
+    conn, csv_type: str, hhid: str, sensor_id: str, start_time: str, end_time: str
+) -> dict:
     """
-    Prüft ob ein Dataset bereits in der Datenbank existiert.
-    Verhindert doppelte Uploads desselben Sensors.
+    Prüft ob ein Dataset Duplikat ist basierend auf Zeitraum-Vergleich.
 
-    TURSO: Diese Funktion wird async:
-        async def check_duplicate(conn, csv_type: str, hhid: str, sensor_id: str, start_time: str) -> bool:
-            meta_table = "fuel_meta" if csv_type == "FUEL" else "exact_meta"
-            result = await conn.execute(...)
-            row = await result.fetchone()
+    Logik (identisch mit remove_duplicates.py):
+    - File B ist Duplikat von A wenn: B.start >= A.start UND B.end <= A.end
+    - Das längere Recording bleibt erhalten!
+
+    Returns:
+        dict mit:
+            - skip_upload: True wenn neue Datei in bestehender enthalten ist
+            - deleted_ids: IDs die gelöscht wurden (weil neue Datei sie enthält)
+            - error: Fehlermeldung falls was schief geht
     """
     meta_table = "fuel_meta" if csv_type == "FUEL" else "exact_meta"
+    meas_table = "fuel_measurement" if csv_type == "FUEL" else "exact_measurement"
+    id_col = "fuel_id" if csv_type == "FUEL" else "exact_id"
+
+    dt_new_start = datetime.strptime(start_time, TIME_FORMAT)
+    dt_new_end = datetime.strptime(end_time, TIME_FORMAT)
+
     cursor = conn.execute(
-        f"SELECT COUNT(*) as cnt FROM {meta_table} WHERE hhid = ? AND sensor_id = ? AND start_time = ?",
-        [hhid, sensor_id, start_time],
+        f"SELECT {id_col}, start_time, end_time FROM {meta_table} WHERE hhid = ? AND sensor_id = ?",
+        [hhid, sensor_id],
     )
-    row = cursor.fetchone()
-    return row["cnt"] > 0 if row else False
+    rows = cursor.fetchall()
+
+    skip_upload = False
+    deleted_ids = []
+
+    for row in rows:
+        existing_id = row[0]
+        dt_existing_start = datetime.strptime(row[1], TIME_FORMAT)
+        dt_existing_end = datetime.strptime(row[2], TIME_FORMAT)
+
+        is_contained = (dt_new_start >= dt_existing_start) and (
+            dt_new_end <= dt_existing_end
+        )
+        is_identical = (dt_new_start == dt_existing_start) and (
+            dt_new_end == dt_existing_end
+        )
+        contains_existing = (dt_new_start <= dt_existing_start) and (
+            dt_new_end >= dt_existing_end
+        )
+
+        if is_contained:
+            if is_identical:
+                skip_upload = True
+            else:
+                skip_upload = True
+        elif contains_existing:
+            deleted_ids.append(existing_id)
+
+    if deleted_ids:
+        for del_id in deleted_ids:
+            conn.execute(f"DELETE FROM {meas_table} WHERE {id_col} = ?", [del_id])
+            conn.execute(f"DELETE FROM {meta_table} WHERE {id_col} = ?", [del_id])
+
+    return {"skip_upload": skip_upload, "deleted_ids": deleted_ids}
 
 
 def process_fuel_csv(filepath: str, conn) -> dict:
@@ -127,13 +168,17 @@ def process_fuel_csv(filepath: str, conn) -> dict:
     sensor_id = str(meta_df.iloc[3, 1]).strip()
     fuel_type = str(meta_df.iloc[9, 1]).strip()
     start_time = str(meta_df.iloc[5, 1]).strip()
+    end_time = str(meta_df.iloc[6, 1]).strip()
 
-    if check_duplicate(conn, "FUEL", hhid, sensor_id, start_time):
+    dup_result = check_duplicate(conn, "FUEL", hhid, sensor_id, start_time, end_time)
+    if dup_result["deleted_ids"]:
+        conn.commit()
+    if dup_result["skip_upload"]:
         return {
             "file": os.path.basename(filepath),
             "type": "FUEL",
             "status": "skipped",
-            "reason": "Duplicate record (same hhid, sensor_id, start_time)",
+            "reason": "Duplicate record (time range contained in existing record)",
             "hhid": hhid,
             "sensor_id": sensor_id,
         }
@@ -196,13 +241,17 @@ def process_exact_csv(filepath: str, conn) -> dict:
     stove_name = str(meta_df.iloc[10, 1]).strip()
     max_temp = str(meta_df.iloc[8, 1]).strip()
     start_time = str(meta_df.iloc[5, 1]).strip()
+    end_time = str(meta_df.iloc[6, 1]).strip()
 
-    if check_duplicate(conn, "EXACT", hhid, sensor_id, start_time):
+    dup_result = check_duplicate(conn, "EXACT", hhid, sensor_id, start_time, end_time)
+    if dup_result["deleted_ids"]:
+        conn.commit()
+    if dup_result["skip_upload"]:
         return {
             "file": os.path.basename(filepath),
             "type": "EXACT",
             "status": "skipped",
-            "reason": "Duplicate record (same hhid, sensor_id, start_time)",
+            "reason": "Duplicate record (time range contained in existing record)",
             "hhid": hhid,
             "sensor_id": sensor_id,
         }

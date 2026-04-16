@@ -300,6 +300,7 @@
         editor = CodeMirror($('#sql-editor'), {
             mode: 'text/x-sql',
             theme: 'idea',
+            cursorBlinkRate: 0,
             lineNumbers: true,
             lineWrapping: true,
             indentWithTabs: false,
