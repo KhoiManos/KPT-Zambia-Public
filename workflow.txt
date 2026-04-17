@@ -12,10 +12,10 @@ SQL substeps (now to Python)
 8. del exact_id with > 1 fuel_id (fehlt noch)
 9. connect measurements (tabelle)
 
-10.back to Python
-11. conn_measurements to csv
+back to Python
+10. conn_measurements to csv
 based on conn_measurements.csv
-12. create different tables 
+11. create different tables 
     1. such as fuel_cons_per_hhid
     2. cooking events
 

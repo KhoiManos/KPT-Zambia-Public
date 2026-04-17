@@ -101,8 +101,6 @@ def remove_duplicates(all_folders, format="%Y-%m-%d %H:%M:%S"):
             if os.path.exists(file_path):
                 os.remove(file_path)
                 delete_count += 1
-                print(f"kapow: {os.path.basename(file_path)}")
-                print(f"+ deleted files: {delete_count}")
 
         
 
