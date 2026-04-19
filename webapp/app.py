@@ -39,10 +39,24 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from database import get_db
-from etl import detect_csv_type, process_fuel_csv, process_exact_csv
+from database import get_db, init_db, reset_db
+from etl import (
+    detect_csv_type,
+    process_fuel_csv,
+    process_exact_csv,
+    run_pipeline_post_upload,
+    cleanup_temp_csv,
+)
 
 app = FastAPI()
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize and reset database on server startup."""
+    init_db()
+    reset_db()
+
 
 STATIC_DIR = "static"
 UPLOAD_DIR = "uploads"
@@ -246,7 +260,15 @@ async def upload_files(files: list[UploadFile] = File(...)):
             if os.path.exists(filepath):
                 os.remove(filepath)
 
-    return {"results": results}
+    pipeline_result = None
+    if results:
+        with get_db() as conn:
+            pipeline_result = run_pipeline_post_upload(conn)
+
+    if pipeline_result:
+        cleanup_temp_csv()
+
+    return {"results": results, "pipeline": pipeline_result}
 
 
 @app.get("/api/query-history")
@@ -255,3 +277,12 @@ async def get_query_history():
     Gibt die letzten 100 Queries zurück.
     """
     return {"history": list(query_history)}
+
+
+@app.post("/api/reset")
+async def reset_database():
+    """
+    Reset database - delete all data but keep table structure.
+    """
+    reset_db()
+    return {"status": "success", "message": "All data cleared"}

@@ -30,6 +30,8 @@ from typing import Optional
 
 import pandas as pd
 
+from cooking_events import run_cooking_events_pipeline
+
 MAX_FUEL_ROWS = 10081
 MAX_EXACT_ROWS = 5041
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -112,6 +114,8 @@ def check_duplicate(
 
     for row in rows:
         existing_id = row[0]
+        if row[1] is None or row[2] is None:
+            continue
         dt_existing_start = datetime.strptime(row[1], TIME_FORMAT)
         dt_existing_end = datetime.strptime(row[2], TIME_FORMAT)
 
@@ -169,6 +173,11 @@ def process_fuel_csv(filepath: str, conn) -> dict:
     fuel_type = str(meta_df.iloc[9, 1]).strip()
     start_time = str(meta_df.iloc[5, 1]).strip()
     end_time = str(meta_df.iloc[6, 1]).strip()
+
+    if not start_time or start_time.lower() == "nan":
+        raise ValueError(f"Missing start_time in {os.path.basename(filepath)}")
+    if not end_time or end_time.lower() == "nan":
+        raise ValueError(f"Missing end_time in {os.path.basename(filepath)}")
 
     dup_result = check_duplicate(conn, "FUEL", hhid, sensor_id, start_time, end_time)
     if dup_result["deleted_ids"]:
@@ -243,6 +252,11 @@ def process_exact_csv(filepath: str, conn) -> dict:
     start_time = str(meta_df.iloc[5, 1]).strip()
     end_time = str(meta_df.iloc[6, 1]).strip()
 
+    if not start_time or start_time.lower() == "nan":
+        raise ValueError(f"Missing start_time in {os.path.basename(filepath)}")
+    if not end_time or end_time.lower() == "nan":
+        raise ValueError(f"Missing end_time in {os.path.basename(filepath)}")
+
     dup_result = check_duplicate(conn, "EXACT", hhid, sensor_id, start_time, end_time)
     if dup_result["deleted_ids"]:
         conn.commit()
@@ -315,3 +329,186 @@ def process_csv(filepath: str, conn) -> dict:
             "status": "error",
             "reason": "Cannot detect CSV type. Filename must contain FUEL or EXACT.",
         }
+
+
+def get_project_dirs():
+    """
+    Ermittelt die Projekt-Verzeichnisse.
+    SQL-Dateien liegen in webapp/sql/.
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    sql_dir = os.path.join(script_dir, "sql")
+    temp_csv_dir = os.path.join(script_dir, "temp_csv")
+    return sql_dir, temp_csv_dir
+
+
+def execute_sql_file(conn, filename: str) -> dict:
+    """
+    Führt eine SQL-Datei aus.
+
+    Args:
+        conn: Datenbank-Verbindung
+        filename: Name der SQL-Datei (ohne Pfad)
+
+    Returns:
+        Dict mit Status
+    """
+    data_dir, _ = get_project_dirs()
+    sql_file_path = os.path.join(data_dir, filename)
+
+    if not os.path.exists(sql_file_path):
+        return {"status": "error", "reason": f"SQL file not found: {filename}"}
+
+    cursor = conn.cursor()
+    with open(sql_file_path, "r", encoding="utf-8") as file:
+        sql_content = file.read()
+    cursor.executescript(sql_content)
+    conn.commit()
+
+    return {"status": "success", "file": filename}
+
+
+def export_conn_measurements_csv(conn) -> dict:
+    """
+    Exportiert conn_measurements Tabelle nach CSV.
+    Speichert im temporären temp_csv Ordner.
+
+    Args:
+        conn: Datenbank-Verbindung
+
+    Returns:
+        Dict mit Pfad zur exportierten Datei
+    """
+    _, temp_csv_dir = get_project_dirs()
+    os.makedirs(temp_csv_dir, exist_ok=True)
+
+    csv_path = os.path.join(temp_csv_dir, "conn_measurements.csv")
+
+    try:
+        df = pd.read_sql("SELECT * FROM conn_measurements", conn)
+        df.to_csv(csv_path, index=False, encoding="utf-8")
+        return {"status": "success", "path": csv_path}
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
+
+
+def cleanup_temp_csv() -> None:
+    """
+    Löscht den temporären CSV-Ordner.
+    """
+    _, temp_csv_dir = get_project_dirs()
+    csv_path = os.path.join(temp_csv_dir, "conn_measurements.csv")
+
+    if os.path.exists(csv_path):
+        os.remove(csv_path)
+
+    if os.path.exists(temp_csv_dir):
+        try:
+            os.rmdir(temp_csv_dir)
+        except OSError:
+            pass
+
+
+def run_pipeline_post_upload(conn) -> dict:
+    """
+    Führt die Post-Upload Pipeline aus (Schritte 6-11).
+    - Indizes erstellen
+    - IDs verbinden
+    - Measurements verbinden
+    - Export nach CSV
+    - Cooking Events + Fuel Cons Berechnung
+
+    Args:
+        conn: Datenbank-Verbindung
+
+    Returns:
+        Dict mit Pipeline-Status
+    """
+    from datetime import datetime
+
+    print(
+        f"[DEBUG] [{datetime.now().strftime('%H:%M:%S')}] Starting pipeline (steps 6-11)..."
+    )
+
+    steps = [
+        ("create_idx.sql", "Creating indices"),
+        ("conn_id.sql", "Connecting IDs"),
+        ("del_exact_id.sql", "Removing duplicate exact_ids"),
+        ("connect_measure.sql", "Connecting measurements"),
+    ]
+
+    results = []
+
+    for sql_file, desc in steps:
+        print(f"[DEBUG] [{datetime.now().strftime('%H:%M:%S')}] Step: {desc}")
+        result = execute_sql_file(conn, sql_file)
+        results.append({"step": desc, "file": sql_file, "status": result["status"]})
+        print(
+            f"[DEBUG] [{datetime.now().strftime('%H:%M:%S')}] Completed: {desc} - Status: {result['status']}"
+        )
+
+        if result["status"] == "error":
+            print(
+                f"[DEBUG] [{datetime.now().strftime('%H:%M:%S')}] ERROR in {desc}: {result.get('reason')}"
+            )
+            return {
+                "status": "error",
+                "step": desc,
+                "reason": result.get("reason", "Unknown error"),
+                "results": results,
+            }
+
+    print(
+        f"[DEBUG] [{datetime.now().strftime('%H:%M:%S')}] Step: Export conn_measurements to CSV"
+    )
+    export_result = export_conn_measurements_csv(conn)
+    results.append({"step": "Export to CSV", "status": export_result["status"]})
+    print(
+        f"[DEBUG] [{datetime.now().strftime('%H:%M:%S')}] Completed: Export - Status: {export_result['status']}"
+    )
+
+    if export_result["status"] == "error":
+        print(
+            f"[DEBUG] [{datetime.now().strftime('%H:%M:%S')}] ERROR in Export: {export_result.get('reason')}"
+        )
+        return {
+            "status": "error",
+            "step": "Export to CSV",
+            "reason": export_result.get("reason"),
+            "results": results,
+        }
+
+    print(
+        f"[DEBUG] [{datetime.now().strftime('%H:%M:%S')}] Step: Cooking events & fuel consumption (Step 11)"
+    )
+    cooking_result = run_cooking_events_pipeline(conn)
+    results.append(
+        {
+            "step": "Cooking events & fuel consumption",
+            "status": cooking_result["status"],
+        }
+    )
+    print(
+        f"[DEBUG] [{datetime.now().strftime('%H:%M:%S')}] Completed: Cooking events - Status: {cooking_result['status']}"
+    )
+    if cooking_result["status"] == "success":
+        print(
+            f"[DEBUG] [{datetime.now().strftime('%H:%M:%S')}] Cooking events: {cooking_result.get('events_total', 0)} total, {cooking_result.get('events_valid', 0)} valid"
+        )
+
+    if cooking_result["status"] == "error":
+        print(
+            f"[DEBUG] [{datetime.now().strftime('%H:%M:%S')}] ERROR in Cooking events: {cooking_result.get('reason')}"
+        )
+        return {
+            "status": "error",
+            "step": "Cooking events",
+            "reason": cooking_result.get("reason"),
+            "results": results,
+        }
+
+    return {
+        "status": "success",
+        "steps_completed": len(results),
+        "results": results,
+    }

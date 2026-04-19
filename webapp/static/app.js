@@ -172,6 +172,23 @@
             }
 
             renderUploadResults(data.results);
+            
+            // Show pipeline progress if available
+            if (data.pipeline && data.pipeline.status === 'success') {
+                const steps = data.pipeline.results || [];
+                const total = steps.length;
+                let progHtml = '<div class="pipeline-progress" style="margin-top:16px;padding:12px;background:#f5f5f5;border-radius:8px;">';
+                progHtml += '<div style="font-size:12px;font-weight:600;margin-bottom:8px;">Processing Pipeline:</div>';
+                steps.forEach((s, i) => {
+                    const done = s.status === 'success';
+                    const icon = done ? '✓' : '○';
+                    const color = done ? '#22c55e' : '#9ca3af';
+                    progHtml += `<div style="color:${color};font-size:13px;margin:4px 0;">${icon} ${s.step}</div>`;
+                });
+                progHtml += '</div>';
+                uploadResultsList.innerHTML += progHtml;
+            }
+            
             checkDbStatus(); // refresh counts
             const successCount = data.results.filter(r => r.status === 'success').length;
             if (successCount) toast(`${successCount} file(s) processed successfully`, 'success');
@@ -218,12 +235,33 @@
 
     function renderTableList(tables) {
         if (!tables.length) { tableList.innerHTML = '<p class="empty-state">No tables found</p>'; return; }
-        tableList.innerHTML = tables.map(t => `
-            <div class="table-item" data-table="${escHtml(t.name)}">
-                <span>${escHtml(t.name)}</span>
-                <span class="row-count">${formatNum(t.row_count)}</span>
-            </div>
-        `).join('');
+
+        const priority = [
+            'fuel_cons_per_hhid', 'cooking_events',
+            'fuel_meta', 'exact_meta',
+            'fuel_measurement', 'exact_measurement'
+        ];
+        const seen = new Set();
+
+        const sorted = [];
+        priority.forEach(name => {
+            const t = tables.find(tbl => tbl.name === name);
+            if (t) { sorted.push(t); seen.add(name); }
+        });
+        tables.forEach(t => { if (!seen.has(t.name)) sorted.push(t); });
+
+        const displayTables = sorted.slice(0, 8);
+
+        const newGroupLen = 2;
+        tableList.innerHTML = displayTables.map((t, i) => {
+            const isNewGroup = i === newGroupLen;
+            const cls = isNewGroup ? 'table-item new-group' : 'table-item';
+            return `
+                <div class="${cls}" data-table="${escHtml(t.name)}">
+                    <span>${escHtml(t.name)}</span>
+                    <span class="row-count">${formatNum(t.row_count)}</span>
+                </div>`;
+        }).join('');
 
         $$('.table-item', tableList).forEach(item => {
             item.addEventListener('click', () => {
@@ -246,44 +284,24 @@
     }
 
     function renderTableDetail(data) {
-        const colsHtml = `
-            <div class="schema-section">
-                <h4>Columns <span class="row-count-badge">${data.columns.length} columns · ${formatNum(data.row_count)} rows</span></h4>
-                <div class="data-table-wrap">
-                    <table class="data-table">
-                        <thead><tr><th>#</th><th>Name</th><th>Type</th><th>Not Null</th></tr></thead>
-                        <tbody>
-                            ${data.columns.map(c => `
-                                <tr>
-                                    <td>${c.cid}</td>
-                                    <td style="font-weight:600">${escHtml(c.name)}</td>
-                                    <td><span class="col-type">${escHtml(c.type || 'ANY')}</span></td>
-                                    <td>${c.notnull ? '✓' : '—'}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </div>`;
+        const colSchema = data.columns.map(c => `${c.name} (${c.type || 'ANY'})`).join(', ');
+        const tableHeader = `<div style="margin-bottom:12px;font-size:13px;color:var(--text-secondary);"><strong>${formatNum(data.row_count)} rows</strong> · ${colSchema}</div>`;
 
         let sampleHtml = '';
         if (data.sample.length) {
             const cols = Object.keys(data.sample[0]);
             sampleHtml = `
-                <div class="schema-section">
-                    <h4>Sample Data (first ${data.sample.length} rows)</h4>
-                    <div class="data-table-wrap" style="max-height:360px; overflow-y:auto;">
-                        <table class="data-table" id="explorer-sample-table">
-                            <thead><tr>${cols.map(c => `<th data-col="${escHtml(c)}">${escHtml(c)} <span class="sort-arrow">↕</span></th>`).join('')}</tr></thead>
-                            <tbody>
-                                ${data.sample.map(row => `<tr>${cols.map(c => `<td>${escHtml(String(row[c] ?? ''))}</td>`).join('')}</tr>`).join('')}
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="data-table-wrap" style="max-height:500px; overflow:auto;">
+                    <table class="data-table" id="explorer-sample-table">
+                        <thead><tr>${cols.map(c => `<th data-col="${escHtml(c)}">${escHtml(c)} <span class="sort-arrow">↕</span></th>`).join('')}</tr></thead>
+                        <tbody>
+                            ${data.sample.map(row => `<tr>${cols.map(c => `<td>${escHtml(String(row[c] ?? ''))}</td>`).join('')}</tr>`).join('')}
+                        </tbody>
+                    </table>
                 </div>`;
         }
 
-        tableDetail.innerHTML = colsHtml + sampleHtml;
+        tableDetail.innerHTML = tableHeader + sampleHtml;
 
         // Make explorer sample table sortable
         const sampleTable = $('#explorer-sample-table', tableDetail);

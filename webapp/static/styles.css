@@ -485,6 +485,11 @@ h4 {
     align-items: start;
 }
 
+.explorer-layout > :last-child {
+    overflow-x: auto;
+    min-width: 0;
+}
+
 @media (max-width: 860px) {
     .explorer-layout {
         grid-template-columns: 1fr;
@@ -530,6 +535,12 @@ h4 {
     border-radius: 4px;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
+}
+
+.table-item.new-group {
+    border-bottom: 2px solid var(--border-subtle);
+    margin-bottom: var(--space-08);
+    padding-bottom: var(--space-16);
 }
 
 .schema-section {
